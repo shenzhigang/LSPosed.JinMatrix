@@ -8,7 +8,7 @@ on:
         required: true
         type: boolean
   push:
-    branches: [ master ]
+    branches: [ before-remove-riru ]
     tags: [ v* ]
   pull_request:
   merge_group:
@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0
 
       - name: Write key
-        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/master' ) || github.ref_type == 'tag' }}
+        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/before-remove-riru' ) || github.ref_type == 'tag' }}
         run: |
           if [ ! -z "${{ secrets.KEY_STORE }}" ]; then
             echo androidStorePassword='${{ secrets.KEY_STORE_PASSWORD }}' >> gradle.properties
@@ -78,7 +78,7 @@ jobs:
           max-size: 2G
           key: ${{ runner.os }}
           restore-keys: ${{ runner.os }}
-          save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/before-remove-riru' }}
 
       - name: Remove Android's cmake
         shell: bash
@@ -152,7 +152,7 @@ jobs:
           path: build/symbols
 
       - name: Post to channel
-        if: ${{ success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && github.ref_type != 'tag' && inputs.post_telegram != 'false' }}
+        if: ${{ success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/before-remove-riru' && github.ref_type != 'tag' && inputs.post_telegram != 'false' }}
         env:
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
           DISCUSSION_ID: ${{ secrets.DISCUSSION_ID }}

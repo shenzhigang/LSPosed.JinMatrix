@@ -3,7 +3,7 @@ name: Crowdin Action
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [ before-remove-riru ]
     paths:
       - app/src/main/res/values/strings.xml
       - daemon/src/main/res/values/strings.xml
@@ -16,13 +16,13 @@ jobs:
       uses: actions/checkout@main
 
     - name: crowdin action
-      uses: crowdin/github-action@master
+      uses: crowdin/github-action@before-remove-riru
       with:
         upload_translations: true
         download_translations: false
         upload_sources: true
         config: 'crowdin.yml'
-        crowdin_branch_name: master
+        crowdin_branch_name: before-remove-riru
       env:
         CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
         CROWDIN_API_TOKEN: ${{ secrets.CROWDIN_API_TOKEN }}

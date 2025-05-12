@@ -1,15 +1,16 @@
 #include "logcat.h"
 
-#include <android/log.h>
 #include <jni.h>
-#include <sys/system_properties.h>
 #include <unistd.h>
-
+#include <string>
+#include <android/log.h>
 #include <array>
 #include <atomic>
-#include <functional>
-#include <string>
+#include <cinttypes>
+#include <chrono>
 #include <thread>
+#include <functional>
+#include <sys/system_properties.h>
 
 using namespace std::string_view_literals;
 using namespace std::chrono_literals;
@@ -18,48 +19,48 @@ constexpr size_t kMaxLogSize = 4 * 1024 * 1024;
 constexpr long kLogBufferSize = 128 * 1024;
 
 namespace {
-constexpr std::array<char, ANDROID_LOG_SILENT + 1> kLogChar = {
-    /*ANDROID_LOG_UNKNOWN*/ '?',
-    /*ANDROID_LOG_DEFAULT*/ '?',
-    /*ANDROID_LOG_VERBOSE*/ 'V',
-    /*ANDROID_LOG_DEBUG*/ 'D',
-    /*ANDROID_LOG_INFO*/ 'I',
-    /*ANDROID_LOG_WARN*/ 'W',
-    /*ANDROID_LOG_ERROR*/ 'E',
-    /*ANDROID_LOG_FATAL*/ 'F',
-    /*ANDROID_LOG_SILENT*/ 'S',
-};
+    constexpr std::array<char, ANDROID_LOG_SILENT + 1> kLogChar = {
+            /*ANDROID_LOG_UNKNOWN*/'?',
+            /*ANDROID_LOG_DEFAULT*/ '?',
+            /*ANDROID_LOG_VERBOSE*/ 'V',
+            /*ANDROID_LOG_DEBUG*/ 'D',
+            /*ANDROID_LOG_INFO*/'I',
+            /*ANDROID_LOG_WARN*/'W',
+            /*ANDROID_LOG_ERROR*/ 'E',
+            /*ANDROID_LOG_FATAL*/ 'F',
+            /*ANDROID_LOG_SILENT*/ 'S',
+    };
 
 long ParseUint(const char *s) {
     if (s[0] == '\0') return -1;
 
-    while (isspace(*s)) {
-        s++;
-    }
+        while (isspace(*s)) {
+            s++;
+        }
 
-    if (s[0] == '-') {
-        return -1;
-    }
-
-    int base = (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) ? 16 : 10;
-    char *end;
-    auto result = strtoull(s, &end, base);
-    if (end == s) {
-        return -1;
-    }
-    if (*end != '\0') {
-        const char *suffixes = "bkmgtpe";
-        const char *suffix;
-        if ((suffix = strchr(suffixes, tolower(*end))) == nullptr ||
-            __builtin_mul_overflow(result, 1ULL << (10 * (suffix - suffixes)), &result)) {
+        if (s[0] == '-') {
             return -1;
         }
+
+        int base = (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) ? 16 : 10;
+        char *end;
+        auto result = strtoull(s, &end, base);
+        if (end == s) {
+            return -1;
+        }
+        if (*end != '\0') {
+            const char *suffixes = "bkmgtpe";
+            const char *suffix;
+            if ((suffix = strchr(suffixes, tolower(*end))) == nullptr ||
+                __builtin_mul_overflow(result, 1ULL << (10 * (suffix - suffixes)), &result)) {
+                return -1;
+            }
+        }
+        if (std::numeric_limits<size_t>::max() < result) {
+            return -1;
+        }
+        return static_cast<size_t>(result);
     }
-    if (std::numeric_limits<size_t>::max() < result) {
-        return -1;
-    }
-    return static_cast<size_t>(result);
-}
 
 inline long GetByteProp(std::string_view prop, long def = -1) {
     std::array<char, PROP_VALUE_MAX> buf{};
@@ -67,26 +68,25 @@ inline long GetByteProp(std::string_view prop, long def = -1) {
     return ParseUint(buf.data());
 }
 
-inline std::string GetStrProp(std::string_view prop, std::string def = {}) {
-    std::array<char, PROP_VALUE_MAX> buf{};
-    if (__system_property_get(prop.data(), buf.data()) < 0) return def;
-    return {buf.data()};
-}
+    inline std::string GetStrProp(std::string_view prop, std::string def = {}) {
+        std::array<char, PROP_VALUE_MAX> buf{};
+        if (__system_property_get(prop.data(), buf.data()) < 0) return def;
+        return {buf.data()};
+    }
 
-inline bool SetIntProp(std::string_view prop, int val) {
-    auto buf = std::to_string(val);
-    return __system_property_set(prop.data(), buf.data()) >= 0;
-}
+    inline bool SetIntProp(std::string_view prop, int val) {
+        auto buf = std::to_string(val);
+        return __system_property_set(prop.data(), buf.data()) >= 0;
+    }
 
-inline bool SetStrProp(std::string_view prop, std::string_view val) {
-    return __system_property_set(prop.data(), val.data()) >= 0;
-}
+    inline bool SetStrProp(std::string_view prop, std::string_view val) {
+        return __system_property_set(prop.data(), val.data()) >= 0;
+    }
 
 }  // namespace
 
 class UniqueFile : public std::unique_ptr<FILE, std::function<void(FILE *)>> {
-    inline static deleter_type deleter = [](auto f) { f &&f != stdout &&fclose(f); };
-
+    inline static deleter_type deleter = [](auto f) { f && f != stdout && fclose(f); };
 public:
     explicit UniqueFile(FILE *f) : std::unique_ptr<FILE, std::function<void(FILE *)>>(f, deleter) {}
 
@@ -97,8 +97,8 @@ public:
 
 class Logcat {
 public:
-    explicit Logcat(JNIEnv *env, jobject thiz, jmethodID method)
-        : env_(env), thiz_(thiz), refresh_fd_method_(method) {}
+    explicit Logcat(JNIEnv *env, jobject thiz, jmethodID method) :
+            env_(env), thiz_(thiz), refresh_fd_method_(method) {}
 
     [[noreturn]] void Run();
 
@@ -151,10 +151,12 @@ size_t Logcat::PrintLogLine(const AndroidLogEntry &entry, FILE *out) {
     }
     localtime_r(&now, &tm);
     strftime(time_buff.data(), time_buff.size(), "%Y-%m-%dT%H:%M:%S", &tm);
-    int len =
-        fprintf(out, "[ %s.%03ld %8d:%6d:%6d %c/%-15.*s ] %.*s\n", time_buff.data(),
-                nsec / MS_PER_NSEC, entry.uid, entry.pid, entry.tid, kLogChar[entry.priority],
-                static_cast<int>(entry.tagLen), entry.tag, static_cast<int>(message_len), message);
+    int len = fprintf(out, "[ %s.%03ld %8d:%6d:%6d %c/%-15.*s ] %.*s\n",
+                      time_buff.data(),
+                      nsec / MS_PER_NSEC,
+                      entry.uid, entry.pid, entry.tid,
+                      kLogChar[entry.priority], static_cast<int>(entry.tagLen),
+                      entry.tag, static_cast<int>(message_len), message);
     fflush(out);
     // trigger overflow when failed to generate a new fd
     if (len <= 0) len = kMaxLogSize;
@@ -220,8 +222,7 @@ void Logcat::ProcessBuffer(struct log_msg *buf) {
 
     std::string_view tag(entry.tag, entry.tagLen);
     bool shortcut = false;
-    if (tag == "LSPosed-Bridge"sv || tag == "XSharedPreferences"sv || tag == "LSPosedContext")
-        [[unlikely]] {
+    if (tag == "LSPosed-Bridge"sv || tag == "XSharedPreferences"sv || tag == "LSPosedContext") [[unlikely]] {
         modules_print_count_ += PrintLogLine(entry, modules_file_.get());
         shortcut = true;
     }
@@ -229,7 +230,7 @@ void Logcat::ProcessBuffer(struct log_msg *buf) {
                      tag == "APatchD"sv || tag == "Dobby"sv || tag.starts_with("dex2oat"sv) ||
                      tag == "KernelSU"sv || tag == "LSPlant"sv || tag == "LSPlt"sv ||
                      tag.starts_with("LSPosed"sv) || tag == "Magisk"sv || tag == "SELinux"sv ||
-                     tag.starts_with("zygisk"sv))) [[unlikely]] {
+                     tag.starts_with("Riru"sv) || tag.starts_with("zygisk"sv))) [[unlikely]] {
         verbose_print_count_ += PrintLogLine(entry, verbose_file_.get());
     }
     if (entry.pid == my_pid_ && tag == "LSPosedLogcat"sv) [[unlikely]] {
@@ -298,9 +299,9 @@ void Logcat::StartLogWatchDog() {
             const auto *pi = __system_property_find(kLogdTagProp.data());
             uint32_t serial = 0;
             if (pi != nullptr) {
-                __system_property_read_callback(
-                    pi, [](auto *c, auto, auto, auto s) { *reinterpret_cast<uint32_t *>(c) = s; },
-                    &serial);
+                __system_property_read_callback(pi, [](auto *c, auto, auto, auto s) {
+                    *reinterpret_cast<uint32_t *>(c) = s;
+                }, &serial);
             }
             if (!__system_property_wait(pi, serial, &serial, nullptr)) break;
             if (pi != nullptr) {
@@ -328,14 +329,14 @@ void Logcat::Run() {
 
     while (true) {
         std::unique_ptr<logger_list, decltype(&android_logger_list_free)> logger_list{
-            android_logger_list_alloc(0, tail, 0), &android_logger_list_free};
+                android_logger_list_alloc(0, tail, 0), &android_logger_list_free};
         tail = tail_after_crash;
 
-        for (log_id id : {LOG_ID_MAIN, LOG_ID_CRASH}) {
+        for (log_id id:{LOG_ID_MAIN, LOG_ID_CRASH}) {
             auto *logger = android_logger_open(logger_list.get(), id);
             if (logger == nullptr) continue;
             if (auto size = android_logger_get_log_size(logger);
-                size >= 0 && static_cast<size_t>(size) < kLogBufferSize) {
+                    size >= 0 && static_cast<size_t>(size) < kLogBufferSize) {
                 android_logger_set_log_size(logger, kLogBufferSize);
             }
         }
@@ -343,22 +344,20 @@ void Logcat::Run() {
         struct log_msg msg{};
 
         while (true) {
-            if (android_logger_list_read(logger_list.get(), &msg) <= 0) [[unlikely]]
-                break;
+            if (android_logger_list_read(logger_list.get(), &msg) <= 0) [[unlikely]] break;
 
             ProcessBuffer(&msg);
 
-            if (verbose_print_count_ >= kMaxLogSize) [[unlikely]]
-                RefreshFd(true);
-            if (modules_print_count_ >= kMaxLogSize) [[unlikely]]
-                RefreshFd(false);
+            if (verbose_print_count_ >= kMaxLogSize) [[unlikely]] RefreshFd(true);
+            if (modules_print_count_ >= kMaxLogSize) [[unlikely]] RefreshFd(false);
         }
 
         OnCrash(errno);
     }
 }
 
-extern "C" JNIEXPORT void JNICALL
+extern "C"
+JNIEXPORT void JNICALL
 // NOLINTNEXTLINE
 Java_org_lsposed_lspd_service_LogcatService_runLogcat(JNIEnv *env, jobject thiz) {
     jclass clazz = env->GetObjectClass(thiz);

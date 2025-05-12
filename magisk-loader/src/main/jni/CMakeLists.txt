@@ -6,7 +6,9 @@ add_subdirectory(${CORE_ROOT} core)
 configure_file(template/loader.cpp src/loader.cpp)
 
 aux_source_directory(src SRC_LIST)
-if (${API} STREQUAL "zygisk")
+if (${API} STREQUAL "riru")
+    set(SRC_LIST ${SRC_LIST} api/riru_main.cpp)
+elseif (${API} STREQUAL "zygisk")
     set(SRC_LIST ${SRC_LIST} api/zygisk_main.cpp)
 endif()
 

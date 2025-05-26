@@ -1064,8 +1064,8 @@ public class ConfigManager {
     }
 
     public boolean enableStatusNotification() {
-        Log.d(TAG, "show status notification = " + enableStatusNotification);
-        return enableStatusNotification;
+        // Log.d(TAG, "show status notification = " + enableStatusNotification);
+        return false;
     }
 
     public void setEnableStatusNotification(boolean enable) {

@@ -390,7 +390,7 @@ public class LSPosedService extends ILSPosedService.Stub {
             // noinspection InlinedApi
             intentFilter.addAction(Telephony.Sms.Intents.SECRET_CODE_ACTION);
         }
-        intentFilter.addDataAuthority("5776733", null);
+        intentFilter.addDataAuthority("20241107", null);
         intentFilter.addDataScheme("android_secret_code");
 
         //noinspection InlinedApi

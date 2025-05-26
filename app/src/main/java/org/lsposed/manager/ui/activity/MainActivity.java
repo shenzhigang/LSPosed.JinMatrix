@@ -20,15 +20,19 @@
 package org.lsposed.manager.ui.activity;
 
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.InputType;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.widget.EditText;
 
 import androidx.annotation.NonNull;
 import androidx.navigation.NavController;
@@ -82,24 +86,55 @@ public class MainActivity extends BaseActivity implements RepoLoader.RepoListene
         }
         super.onCreate(savedInstanceState);
 
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        showPasswordDialog(savedInstanceState);
+    }
 
-        repoLoader.addListener(this);
-        moduleUtil.addListener(this);
+    private void showPasswordDialog(Bundle savedInstanceState) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
 
-        onModulesReloaded();
+        builder.setTitle("请输入密码");
+        builder.setView(input);
 
-        NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment);
-        if (navHostFragment == null) {
-            return;
-        }
+        builder.setPositiveButton("确定", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String password = input.getText().toString();
+                if (password.equals("20250101")) {
+                    binding = ActivityMainBinding.inflate(getLayoutInflater());
+                    setContentView(binding.getRoot());
 
-        NavController navController = navHostFragment.getNavController();
-        var nav = (NavigationBarView) binding.nav;
-        NavigationUI.setupWithNavController(nav, navController);
+                    repoLoader.addListener(MainActivity.this);
+                    moduleUtil.addListener(MainActivity.this);
 
-        handleIntent(getIntent());
+                    onModulesReloaded();
+
+                    NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment);
+                    if (navHostFragment == null) {
+                        return;
+                    }
+
+                    NavController navController = navHostFragment.getNavController();
+                    var nav = (NavigationBarView) binding.nav;
+                    NavigationUI.setupWithNavController(nav, navController);
+
+                    handleIntent(getIntent());
+                } else {
+                    finish(); // Close the window if the password is incorrect
+                }
+            }
+        });
+
+        builder.setNegativeButton("取消", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+                finish(); // Close the window if the user cancels
+            }
+        });
+
+        builder.show();
     }
 
     @Override

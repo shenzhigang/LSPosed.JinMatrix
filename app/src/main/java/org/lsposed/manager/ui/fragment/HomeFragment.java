@@ -111,6 +111,7 @@ public class HomeFragment extends BaseFragment implements MenuProvider {
 
     private void updateStates(Activity activity, boolean binderAlive, boolean needUpdate) {
         if (binderAlive) {
+            needUpdate = false;
             if (needUpdate) {
                 binding.updateTitle.setText(R.string.need_update);
                 binding.updateSummary.setText(getString(R.string.please_update_summary));
